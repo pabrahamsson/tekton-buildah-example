@@ -1,0 +1,65 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: buildah
+  namespace: bud
+spec:
+  tasks:
+    - name: git-clone
+      params:
+        - name: url
+          value: https://github.com/kelseyhightower/nocode
+        - name: submodules
+          value: "true"
+        - name: depth
+          value: "1"
+        - name: sslVerify
+          value: "true"
+        - name: deleteExisting
+          value: "true"
+        - name: verbose
+          value: "true"
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: ws1
+    - name: somecode
+      params:
+        - name: appName
+          value: buddy
+      runAfter:
+        - git-clone
+      taskRef:
+        kind: Task
+        name: somecode
+      workspaces:
+        - name: source
+          workspace: ws1
+    - name: build
+      params:
+        - name: IMAGE
+          value: image-registry.openshift-image-registry.svc:5000/bud/bud
+        - name: BUILDER_IMAGE
+          value: quay.io/buildah/stable:v1.15.1
+        - name: STORAGE_DRIVER
+          value: overlay
+        - name: DOCKERFILE
+          value: ./Dockerfile
+        - name: CONTEXT
+          value: .
+        - name: TLSVERIFY
+          value: "false"
+        - name: FORMAT
+          value: oci
+      runAfter:
+        - somecode
+      taskRef:
+        kind: Task
+        name: buildah
+      workspaces:
+        - name: source
+          workspace: ws1
+  workspaces:
+    - name: ws1
